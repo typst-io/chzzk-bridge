@@ -93,6 +93,21 @@ public class TokenRecord extends UpdatableRecordImpl<TokenRecord> {
         return (Long) get(4);
     }
 
+    /**
+     * Setter for <code>token.token_last_sent_event_id</code>.
+     */
+    public TokenRecord setTokenLastSentEventId(Integer value) {
+        set(5, value);
+        return this;
+    }
+
+    /**
+     * Getter for <code>token.token_last_sent_event_id</code>.
+     */
+    public Integer getTokenLastSentEventId() {
+        return (Integer) get(5);
+    }
+
     // -------------------------------------------------------------------------
     // Primary key information
     // -------------------------------------------------------------------------
@@ -116,7 +131,7 @@ public class TokenRecord extends UpdatableRecordImpl<TokenRecord> {
     /**
      * Create a detached, initialised TokenRecord
      */
-    public TokenRecord(String tokenChannelId, String tokenMcUuid, String tokenAccessToken, String tokenRefreshToken, Long tokenExpireTime) {
+    public TokenRecord(String tokenChannelId, String tokenMcUuid, String tokenAccessToken, String tokenRefreshToken, Long tokenExpireTime, Integer tokenLastSentEventId) {
         super(Token.TOKEN);
 
         setTokenChannelId(tokenChannelId);
@@ -124,6 +139,7 @@ public class TokenRecord extends UpdatableRecordImpl<TokenRecord> {
         setTokenAccessToken(tokenAccessToken);
         setTokenRefreshToken(tokenRefreshToken);
         setTokenExpireTime(tokenExpireTime);
+        setTokenLastSentEventId(tokenLastSentEventId);
         resetChangedOnNotNull();
     }
 
@@ -139,6 +155,7 @@ public class TokenRecord extends UpdatableRecordImpl<TokenRecord> {
             setTokenAccessToken(value.getTokenAccessToken());
             setTokenRefreshToken(value.getTokenRefreshToken());
             setTokenExpireTime(value.getTokenExpireTime());
+            setTokenLastSentEventId(value.getTokenLastSentEventId());
             resetChangedOnNotNull();
         }
     }

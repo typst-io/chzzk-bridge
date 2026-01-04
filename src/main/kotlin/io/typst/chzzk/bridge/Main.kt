@@ -9,12 +9,7 @@ import io.typst.chzzk.bridge.chzzk.ChzzkGateway
 import io.typst.chzzk.bridge.chzzk.chzzk4j.Chzzk4jGateway
 import io.typst.chzzk.bridge.repository.BridgeRepository
 import io.typst.chzzk.bridge.repository.SQLiteBridgeRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.*
 import xyz.r2turntrue.chzzk4j.auth.ChzzkOauthLoginAdapter
 import java.io.File
 import java.net.URI
@@ -34,6 +29,8 @@ fun getEnvOrThrow(key: String): String =
     System.getenv(key) ?: throw IllegalStateException("Please set environment variable: `$key`")
 
 suspend fun main(args: Array<String>): Unit = supervisorScope {
+    System.setProperty("org.jooq.no-tips", "true")
+    System.setProperty("org.jooq.no-logo", "true")
     val service = createChzzkService(this)
     startApp(this, service).join()
 }
@@ -82,8 +79,15 @@ suspend fun startApp(scope: CoroutineScope, service: ChzzkService): Job {
         try {
             awaitCancellation()
         } finally {
-            apiServer.stop()
-            oAuthServer.stop()
+            try {
+                apiServer.stop()
+                oAuthServer.stop()
+                service.close()
+                println("server closed")
+            } catch (ex: Throwable) {
+                println("fuck!")
+                ex.printStackTrace()
+            }
         }
     }
 }

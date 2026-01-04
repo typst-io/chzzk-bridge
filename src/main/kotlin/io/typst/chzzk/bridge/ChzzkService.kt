@@ -8,11 +8,18 @@ import io.typst.chzzk.bridge.persis.UserToken
 import io.typst.chzzk.bridge.repository.BridgeRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.util.*
 import java.util.concurrent.CompletionStage
+
+sealed class CreateSessionResult {
+    data class Success(val session: CompletionStage<ChzzkSessionGateway>, val created: Boolean) : CreateSessionResult()
+    data object LoginFailed : CreateSessionResult()
+    data object RefreshTokenExpired : CreateSessionResult()
+}
 
 data class ChzzkService(
     val coroutineScope: CoroutineScope,
@@ -28,20 +35,27 @@ data class ChzzkService(
         return sessionStore.removeState(state)
     }
 
-    suspend fun createSession(userLoginMethod: UserLoginMethod): Pair<CompletionStage<ChzzkSessionGateway>, Boolean>? {
+    suspend fun createSession(userLoginMethod: UserLoginMethod): CreateSessionResult {
         val (future, created) = sessionStore.acquireSession(userLoginMethod.uuid)
         if (!created) {
-            return future to false
+            return CreateSessionResult.Success(future, created = false)
         }
 
         var newUserLoginMethod = userLoginMethod
-        // if expire
+        // if access token expired, try refresh
         val theToken = if (newUserLoginMethod.method is LoginMethod.UseToken) {
             bridgeRepository.getToken(newUserLoginMethod.uuid)
         } else null
         if (theToken?.isExpired() == true) {
-            val newToken = chzzkGateway.refreshToken(theToken.refreshToken)
-            newUserLoginMethod = newUserLoginMethod.copy(method = newToken)
+            val refreshed = runCatching { chzzkGateway.refreshToken(theToken.refreshToken) }
+            if (refreshed.isFailure) {
+                // refresh token expired - delete token and require re-authentication
+                future.cancel(true)
+                sessionStore.removeSession(newUserLoginMethod.uuid)
+                bridgeRepository.deleteToken(newUserLoginMethod.uuid)
+                return CreateSessionResult.RefreshTokenExpired
+            }
+            newUserLoginMethod = newUserLoginMethod.copy(method = refreshed.getOrThrow())
         }
 
         val chzzkUser = chzzkGateway.login(newUserLoginMethod)
@@ -49,7 +63,7 @@ data class ChzzkService(
             // badToken or expired
             future.cancel(true)
             sessionStore.removeSession(newUserLoginMethod.uuid)
-            return null
+            return CreateSessionResult.LoginFailed
         }
         val newToken =
             if (newUserLoginMethod.method is LoginMethod.CreateToken || userLoginMethod.method != newUserLoginMethod.method) {
@@ -73,7 +87,7 @@ data class ChzzkService(
             val session = chzzkGateway.connectSession()
             future.complete(session)
         }
-        return future to true
+        return CreateSessionResult.Success(future, created = true)
     }
 
     suspend fun removeSession(mcUuid: UUID): CompletionStage<ChzzkSessionGateway>? {
@@ -85,7 +99,8 @@ data class ChzzkService(
         return removed
     }
 
-    suspend fun close() {
+    fun close() {
+        coroutineScope.cancel()
         bridgeRepository.close()
     }
 }

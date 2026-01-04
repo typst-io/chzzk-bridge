@@ -20,6 +20,7 @@ public class Token implements Serializable {
     private final String tokenAccessToken;
     private final String tokenRefreshToken;
     private final Long tokenExpireTime;
+    private final Integer tokenLastSentEventId;
 
     public Token(Token value) {
         this.tokenChannelId = value.tokenChannelId;
@@ -27,6 +28,7 @@ public class Token implements Serializable {
         this.tokenAccessToken = value.tokenAccessToken;
         this.tokenRefreshToken = value.tokenRefreshToken;
         this.tokenExpireTime = value.tokenExpireTime;
+        this.tokenLastSentEventId = value.tokenLastSentEventId;
     }
 
     public Token(
@@ -34,13 +36,15 @@ public class Token implements Serializable {
         String tokenMcUuid,
         String tokenAccessToken,
         String tokenRefreshToken,
-        Long tokenExpireTime
+        Long tokenExpireTime,
+        Integer tokenLastSentEventId
     ) {
         this.tokenChannelId = tokenChannelId;
         this.tokenMcUuid = tokenMcUuid;
         this.tokenAccessToken = tokenAccessToken;
         this.tokenRefreshToken = tokenRefreshToken;
         this.tokenExpireTime = tokenExpireTime;
+        this.tokenLastSentEventId = tokenLastSentEventId;
     }
 
     /**
@@ -76,6 +80,13 @@ public class Token implements Serializable {
      */
     public Long getTokenExpireTime() {
         return this.tokenExpireTime;
+    }
+
+    /**
+     * Getter for <code>token.token_last_sent_event_id</code>.
+     */
+    public Integer getTokenLastSentEventId() {
+        return this.tokenLastSentEventId;
     }
 
     @Override
@@ -117,6 +128,12 @@ public class Token implements Serializable {
         }
         else if (!this.tokenExpireTime.equals(other.tokenExpireTime))
             return false;
+        if (this.tokenLastSentEventId == null) {
+            if (other.tokenLastSentEventId != null)
+                return false;
+        }
+        else if (!this.tokenLastSentEventId.equals(other.tokenLastSentEventId))
+            return false;
         return true;
     }
 
@@ -129,6 +146,7 @@ public class Token implements Serializable {
         result = prime * result + ((this.tokenAccessToken == null) ? 0 : this.tokenAccessToken.hashCode());
         result = prime * result + ((this.tokenRefreshToken == null) ? 0 : this.tokenRefreshToken.hashCode());
         result = prime * result + ((this.tokenExpireTime == null) ? 0 : this.tokenExpireTime.hashCode());
+        result = prime * result + ((this.tokenLastSentEventId == null) ? 0 : this.tokenLastSentEventId.hashCode());
         return result;
     }
 
@@ -141,6 +159,7 @@ public class Token implements Serializable {
         sb.append(", ").append(tokenAccessToken);
         sb.append(", ").append(tokenRefreshToken);
         sb.append(", ").append(tokenExpireTime);
+        sb.append(", ").append(tokenLastSentEventId);
 
         sb.append(")");
         return sb.toString();

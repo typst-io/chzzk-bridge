@@ -1,6 +1,6 @@
 package io.typst.chzzk.bridge.chzzk.chzzk4j
 
-import io.typst.chzzk.bridge.api.ApiFetchChzzkMessage
+import io.typst.chzzk.bridge.api.ApiSseChatMessage
 import io.typst.chzzk.bridge.auth.LoginMethod
 import io.typst.chzzk.bridge.auth.UserLoginMethod
 import io.typst.chzzk.bridge.chzzk.ChzzkGateway
@@ -83,7 +83,7 @@ class Chzzk4jGateway(
             println("Message: ${e.message}")
             val msg = e.message
             // chzzk4j 에서 ZoneId 고정을 안시키므로 시간은 임의로 설정
-            val data = ApiFetchChzzkMessage(
+            val data = ApiSseChatMessage(
                 -1,
                 e.message.receivedChannelId,
                 msg.senderChannelId,
@@ -98,7 +98,7 @@ class Chzzk4jGateway(
         session.on(SessionDonationEvent::class.java) { e ->
             val msg = e.message
             val data =
-                ApiFetchChzzkMessage(
+                ApiSseChatMessage(
                     -1,
                     msg.receivedChannelId,
                     msg.donatorChannelId,

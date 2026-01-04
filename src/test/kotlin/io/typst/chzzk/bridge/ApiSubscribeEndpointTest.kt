@@ -5,15 +5,15 @@ import io.ktor.client.plugins.resources.*
 import io.ktor.client.plugins.sse.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import io.typst.chzzk.bridge.api.ApiFetchChzzkMessage
-import io.typst.chzzk.bridge.api.ApiFetchResponseBody
+import io.typst.chzzk.bridge.api.ApiSseChatMessage
 import io.typst.chzzk.bridge.api.ApiSubscribeResponseBody
 import io.typst.chzzk.bridge.auth.LoginMethod
 import io.typst.chzzk.bridge.auth.UserLoginMethod
 import io.typst.chzzk.bridge.mock.TestChzzkGateway
 import io.typst.chzzk.bridge.persis.UserToken
 import io.typst.chzzk.bridge.repository.SQLiteBridgeRepository
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
@@ -90,16 +90,49 @@ class ApiSubscribeEndpointTest {
 
     @Test
     fun `subscribe with expired access token`(): Unit = createTestApplication(service) {
-        val now = nowInstant()
-        val expiredToken = token.copy(expireTime = nowInstant().plusSeconds(1))
+        // Create a token that is already expired (expireTime in the past)
+        val expiredToken = token.copy(expireTime = nowInstant().minusSeconds(60))
         service.bridgeRepository.setToken(expiredToken)
+        // Register token with valid refresh token - this enables token refresh
         testChzzkGateway.registerToken(expiredToken)
+
         val response = client.post(ApiSubscribePathParameters(uuid))
+
+        // Should succeed because refresh token is valid and can obtain new access token
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        // Verify that a new token was saved (refresh rotates the token)
+        val savedToken = service.bridgeRepository.getToken(uuid)
+        assertNotNull(savedToken)
+        // New access token should be different from the expired one
+        assert(savedToken!!.accessToken != expiredToken.accessToken) {
+            "Access token should be rotated after refresh"
+        }
     }
 
     @Test
     fun `subscribe with expired refresh token`(): Unit = createTestApplication(service) {
-        // TODO:
+        // Create a token that is already expired
+        val expiredToken = token.copy(expireTime = nowInstant().minusSeconds(60))
+        service.bridgeRepository.setToken(expiredToken)
+        // Register token but then invalidate the refresh token
+        testChzzkGateway.registerToken(expiredToken)
+        // Remove refresh token from valid tokens - simulates expired/revoked refresh token
+        testChzzkGateway.validRefreshTokens.remove(expiredToken.refreshToken)
+
+        val response = client.post(ApiSubscribePathParameters(uuid))
+
+        // Should return Unauthorized with state for re-authentication (like no token case)
+        assertEquals(HttpStatusCode.Unauthorized, response.status)
+
+        // Verify response contains interlock URL
+        val body = response.body<ApiSubscribeResponseBody>()
+        assertNotNull(body.state)
+        assertNotNull(body.path)
+
+        // Verify token was deleted from repository
+        val deletedToken = service.bridgeRepository.getToken(uuid)
+        assertEquals(null, deletedToken)
     }
 
     @Test
@@ -153,26 +186,25 @@ class ApiSubscribeEndpointTest {
         bridgeRepo.setToken(token)
         // add data first (no need to subscribe for fetch test)
         val donationMsg =
-            ApiFetchChzzkMessage(1, token.channelId, "EntryPoint", "EntryPoint", "test donation", nowInstant(), 10)
+            ApiSseChatMessage(1, token.channelId, "EntryPoint", "EntryPoint", "test donation", nowInstant(), 10)
         bridgeRepo.addMessage(donationMsg)
         val msgMsg =
-            ApiFetchChzzkMessage(2, token.channelId, "EntryPoint", "EntryPoint", "test message", nowInstant())
+            ApiSseChatMessage(2, token.channelId, "EntryPoint", "EntryPoint", "test message", nowInstant())
         bridgeRepo.addMessage(msgMsg)
 
         // fetch via SSE with uuid query parameter
         client.sse({
-            url("api/v1/sse?fromId=1&uuid=$uuid")
+            url("api/v1/sse?uuid=$uuid")
         }, deserialize = { typeInfo, jsonString ->
             val serializer = Json.serializersModule.serializer(typeInfo.kotlinType!!)
             Json.decodeFromString(serializer, jsonString)!!
         }) {
-            // receive first event and verify
-            val event = incoming.first()
-            val data = Json.decodeFromString<ApiFetchResponseBody>(event.data!!)
-            assertEquals(
-                ApiFetchResponseBody(listOf(donationMsg, msgMsg)),
-                data
-            )
+            // receive individual messages
+            val events = incoming.take(2).toList()
+            val receivedMessages = events.map { event ->
+                Json.decodeFromString<ApiSseChatMessage>(event.data!!)
+            }
+            assertEquals(listOf(donationMsg, msgMsg), receivedMessages)
         }
     }
 }

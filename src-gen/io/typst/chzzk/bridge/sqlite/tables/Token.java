@@ -78,6 +78,11 @@ public class Token extends TableImpl<TokenRecord> {
      */
     public final TableField<TokenRecord, Long> TOKEN_EXPIRE_TIME = createField(DSL.name("token_expire_time"), SQLDataType.BIGINT.nullable(false), this, "");
 
+    /**
+     * The column <code>token.token_last_sent_event_id</code>.
+     */
+    public final TableField<TokenRecord, Integer> TOKEN_LAST_SENT_EVENT_ID = createField(DSL.name("token_last_sent_event_id"), SQLDataType.INTEGER.nullable(false).defaultValue(DSL.field(DSL.raw("0"), SQLDataType.INTEGER)), this, "");
+
     private Token(Name alias, Table<TokenRecord> aliased) {
         this(alias, aliased, (Field<?>[]) null, null);
     }

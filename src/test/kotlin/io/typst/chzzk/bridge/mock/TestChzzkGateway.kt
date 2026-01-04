@@ -41,12 +41,24 @@ class TestChzzkGateway(
         val oldAccessToken = validRefreshTokens.remove(refreshToken)
             ?: throw IllegalArgumentException("Invalid or expired refresh token")
 
-        // Invalidate old access token
-        issuedTokens.remove(oldAccessToken)
+        // Invalidate old access token and get old token data
+        val oldToken = issuedTokens.remove(oldAccessToken)
 
         // Issue new token pair (token rotation per OAuth 2.0 best practices)
         val newAccessToken = generateAccessToken()
         val newRefreshToken = generateRefreshToken()
+
+        // Register new token in issuedTokens (required for subsequent login validation)
+        if (oldToken != null) {
+            val newToken = UserToken(
+                channelId = oldToken.channelId,
+                mcUuid = oldToken.mcUuid,
+                accessToken = newAccessToken,
+                refreshToken = newRefreshToken,
+                expireTime = Instant.now().plus(tokenExpirationDuration),
+            )
+            issuedTokens[newAccessToken] = newToken
+        }
 
         // Register new refresh token mapping
         validRefreshTokens[newRefreshToken] = newAccessToken
