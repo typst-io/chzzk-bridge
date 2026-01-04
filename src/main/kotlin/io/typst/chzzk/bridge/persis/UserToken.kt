@@ -12,6 +12,7 @@ data class UserToken(
     val accessToken: String,
     val refreshToken: String,
     val expireTime: InstantAsLong,
+    val lastSentEventId: Int = 0,
 ) {
     fun isExpired(now: Instant = Instant.now()): Boolean =
         now >= expireTime

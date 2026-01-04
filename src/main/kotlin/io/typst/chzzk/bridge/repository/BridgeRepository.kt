@@ -1,8 +1,7 @@
 package io.typst.chzzk.bridge.repository
 
-import io.typst.chzzk.bridge.api.ApiFetchChzzkMessage
+import io.typst.chzzk.bridge.api.ApiSseChatMessage
 import io.typst.chzzk.bridge.persis.UserToken
-import java.io.Closeable
 import java.util.*
 
 interface BridgeRepository {
@@ -10,9 +9,13 @@ interface BridgeRepository {
 
     suspend fun setToken(token: UserToken)
 
-    suspend fun addMessage(x: ApiFetchChzzkMessage)
+    suspend fun deleteToken(id: UUID)
 
-    suspend fun getMessages(mcUuid: UUID, fromId: Int): List<ApiFetchChzzkMessage>
+    suspend fun addMessage(x: ApiSseChatMessage)
 
-    suspend fun close()
+    suspend fun getMessages(mcUuid: UUID, fromId: Int): List<ApiSseChatMessage>
+
+    suspend fun updateLastSentEventId(mcUuid: UUID, eventId: Int)
+
+    fun close()
 }

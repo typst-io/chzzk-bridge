@@ -2,23 +2,16 @@ package io.typst.chzzk.bridge.repository
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
-import io.typst.chzzk.bridge.api.ApiFetchChzzkMessage
+import io.typst.chzzk.bridge.api.ApiSseChatMessage
 import io.typst.chzzk.bridge.persis.UserToken
 import io.typst.chzzk.bridge.sqlite.Tables.EVENT
 import io.typst.chzzk.bridge.sqlite.Tables.TOKEN
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.reactive.asFlow
-import kotlinx.coroutines.reactive.awaitFirst
-import kotlinx.coroutines.reactive.awaitFirstOrNull
-import kotlinx.coroutines.reactive.awaitSingle
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
 import org.flywaydb.core.Flyway
 import org.jooq.DSLContext
 import org.jooq.SQLDialect
 import org.jooq.impl.DSL
-import org.jooq.kotlin.coroutines.transactionCoroutine
 import java.io.File
 import java.time.Instant
 import java.util.*
@@ -51,24 +44,24 @@ class SQLiteBridgeRepository(
             .migrate()
     }
 
-    override suspend fun getToken(id: UUID): UserToken? {
-        return dsl.selectFrom(TOKEN)
+    override suspend fun getToken(id: UUID): UserToken? = runInterruptible(Dispatchers.IO) {
+        dsl.selectFrom(TOKEN)
             .where(TOKEN.TOKEN_MC_UUID.eq(id.toString()))
-            .awaitFirstOrNull()
-            ?.let { record ->
+            .fetchOne { record ->
                 UserToken(
                     channelId = record.tokenChannelId,
                     mcUuid = id,
                     accessToken = record.tokenAccessToken,
                     refreshToken = record.tokenRefreshToken,
-                    expireTime = Instant.ofEpochMilli(record.tokenExpireTime)
+                    expireTime = Instant.ofEpochMilli(record.tokenExpireTime),
+                    lastSentEventId = record.tokenLastSentEventId,
                 )
             }
     }
 
-    override suspend fun setToken(token: UserToken) {
-        dsl.transactionCoroutine {
-            val ctx = DSL.using(it)
+    override suspend fun setToken(token: UserToken) = runInterruptible(Dispatchers.IO) {
+        dsl.transaction { trx ->
+            val ctx = trx.dsl()
             assert(
                 ctx.insertInto(TOKEN)
                     .set(TOKEN.TOKEN_CHANNEL_ID, token.channelId)
@@ -76,19 +69,26 @@ class SQLiteBridgeRepository(
                     .set(TOKEN.TOKEN_ACCESS_TOKEN, token.accessToken)
                     .set(TOKEN.TOKEN_REFRESH_TOKEN, token.refreshToken)
                     .set(TOKEN.TOKEN_EXPIRE_TIME, token.expireTime.toEpochMilli())
+                    .set(TOKEN.TOKEN_LAST_SENT_EVENT_ID, token.lastSentEventId)
                     .onConflict(TOKEN.TOKEN_CHANNEL_ID)
                     .doUpdate()
                     .set(TOKEN.TOKEN_MC_UUID, token.mcUuid.toString())
                     .set(TOKEN.TOKEN_ACCESS_TOKEN, token.accessToken)
                     .set(TOKEN.TOKEN_REFRESH_TOKEN, token.refreshToken)
                     .set(TOKEN.TOKEN_EXPIRE_TIME, token.expireTime.toEpochMilli())
-                    .awaitSingle() == 1
+                    .execute() == 1
             )
         }
     }
 
-    override suspend fun addMessage(x: ApiFetchChzzkMessage) {
-        dsl.transactionCoroutine {
+    override suspend fun deleteToken(id: UUID): Unit = runInterruptible(Dispatchers.IO) {
+        dsl.deleteFrom(TOKEN)
+            .where(TOKEN.TOKEN_MC_UUID.eq(id.toString()))
+            .execute()
+    }
+
+    override suspend fun addMessage(x: ApiSseChatMessage): Unit = runInterruptible(Dispatchers.IO) {
+        dsl.transaction { it ->
             val ctx = DSL.using(it)
             ctx.insertInto(EVENT)
                 .set(EVENT.EVENT_CHANNEL_ID, x.channelId)
@@ -97,44 +97,48 @@ class SQLiteBridgeRepository(
                 .set(EVENT.EVENT_MESSAGE, x.message)
                 .set(EVENT.EVENT_TIME, x.messageTime.toEpochMilli())
                 .set(EVENT.EVENT_PAY_AMOUNT, x.payAmount)
-                .awaitFirst()
+                .execute()
         }
     }
 
-    override suspend fun getMessages(mcUuid: UUID, fromId: Int): List<ApiFetchChzzkMessage> {
-        return dsl.transactionCoroutine { config ->
-            val ctx = DSL.using(config)
-
-            val messages = ctx.select(EVENT)
-                .from(EVENT)
-                .join(TOKEN).on(TOKEN.TOKEN_CHANNEL_ID.eq(EVENT.EVENT_CHANNEL_ID))
-                .where(
-                    TOKEN.TOKEN_MC_UUID.eq(mcUuid.toString())
-                        .and(EVENT.EVENT_ID.greaterOrEqual(fromId))
-                )
-                .orderBy(EVENT.EVENT_ID.asc())
-                .asFlow()
-                .map { tup ->
-                    val record = tup.value1()
-                    ApiFetchChzzkMessage(
-                        record.eventId,
-                        record.eventChannelId,
-                        record.eventSenderId,
-                        record.eventSenderName,
-                        record.eventMessage,
-                        Instant.ofEpochMilli(record.eventTime),
-                        record.eventPayAmount
+    override suspend fun getMessages(mcUuid: UUID, fromId: Int): List<ApiSseChatMessage> =
+        runInterruptible(Dispatchers.IO) {
+            dsl.transactionResult { config ->
+                val ctx = DSL.using(config)
+                val messages = ctx.select(EVENT)
+                    .from(EVENT)
+                    .join(TOKEN).on(TOKEN.TOKEN_CHANNEL_ID.eq(EVENT.EVENT_CHANNEL_ID))
+                    .where(
+                        TOKEN.TOKEN_MC_UUID.eq(mcUuid.toString())
+                            .and(EVENT.EVENT_ID.greaterOrEqual(fromId))
                     )
-                }
-            messages.toList()
+                    .orderBy(EVENT.EVENT_ID.asc())
+                    .map { tup ->
+                        val record = tup.value1()
+                        ApiSseChatMessage(
+                            record.eventId,
+                            record.eventChannelId,
+                            record.eventSenderId,
+                            record.eventSenderName,
+                            record.eventMessage,
+                            Instant.ofEpochMilli(record.eventTime),
+                            record.eventPayAmount
+                        )
+                    }
+                messages.toList()
+            }
         }
+
+    override suspend fun updateLastSentEventId(mcUuid: UUID, eventId: Int): Unit = runInterruptible(Dispatchers.IO) {
+        assert(dsl.update(TOKEN)
+            .set(TOKEN.TOKEN_LAST_SENT_EVENT_ID, eventId)
+            .where(TOKEN.TOKEN_MC_UUID.eq(mcUuid.toString()))
+            .execute() == 1)
     }
 
-    override suspend fun close() {
+    override fun close() {
         if (lazyDataSource.isInitialized()) {
-            withContext(Dispatchers.IO) {
-                dataSource.close()
-            }
+            dataSource.close()
         }
     }
 }

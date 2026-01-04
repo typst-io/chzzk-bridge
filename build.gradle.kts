@@ -63,6 +63,7 @@ dependencies {
     testImplementation(libs.ktor.client.cio)
     testImplementation(libs.ktor.client.mock)
     testRuntimeOnly(commons.junit.platform.launcher)
+    testImplementation(libs.gson)
     testImplementation(kotlin("test"))
 }
 

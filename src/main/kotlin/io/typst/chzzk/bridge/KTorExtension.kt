@@ -9,6 +9,8 @@ import io.ktor.server.resources.Resources
 import io.ktor.server.resources.post
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
+import io.ktor.sse.*
+import kotlin.time.Duration.Companion.seconds
 import io.typst.chzzk.bridge.endpoint.ApiEndpoints
 import io.typst.chzzk.bridge.endpoint.OAuthEndpoints
 import io.typst.chzzk.bridge.ser.UUIDAsString
@@ -48,10 +50,17 @@ fun Application.apiModule(service: ChzzkService) {
     routing {
         post<ApiSubscribePathParameters> { ApiEndpoints.onPostSubscribe(this, it, service) }
         post<ApiUnsubscribePathParameters> { ApiEndpoints.onPostUnsubscribe(this, it, service) }
-        sse("/api/v1/sse", serialize = { typeInfo, it ->
-            val serializer = Json.serializersModule.serializer(typeInfo.kotlinType!!)
-            Json.encodeToString(serializer, it)
-        }) {
+        sse(
+            "/api/v1/sse",
+            serialize = { typeInfo, it ->
+                val serializer = Json.serializersModule.serializer(typeInfo.kotlinType!!)
+                Json.encodeToString(serializer, it)
+            }
+        ) {
+            heartbeat {
+                period = 30.seconds
+                event = ServerSentEvent("{}", event = "heartbeat")
+            }
             ApiEndpoints.onSseFetch(this, service.bridgeRepository)
         }
     }

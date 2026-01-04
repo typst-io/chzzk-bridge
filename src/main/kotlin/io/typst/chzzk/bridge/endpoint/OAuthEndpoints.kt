@@ -4,6 +4,7 @@ import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.typst.chzzk.bridge.ChzzkService
+import io.typst.chzzk.bridge.CreateSessionResult
 import io.typst.chzzk.bridge.OAuthCallbackPathParameters
 import io.typst.chzzk.bridge.auth.LoginMethod
 import io.typst.chzzk.bridge.auth.UserLoginMethod
@@ -37,20 +38,26 @@ object OAuthEndpoints {
         }
 
         val loginMethod = UserLoginMethod(uuid, LoginMethod.CreateToken(code, state))
-        val result = service.createSession(loginMethod)
-        if (result == null) {
-            call.respondText("Internal error!")
-            call.response.status(HttpStatusCode.InternalServerError)
-            return
-        }
-        val (session, created) = result
-        if (created) {
-            session.await()
-            call.respondText("OK!")
-            call.response.status(HttpStatusCode.OK)
-        } else {
-            call.respondText("Duplicate session!")
-            call.response.status(HttpStatusCode.NoContent)
+        when (val result = service.createSession(loginMethod)) {
+            is CreateSessionResult.Success -> {
+                if (result.created) {
+                    result.session.await()
+                    call.respondText("OK!")
+                    call.response.status(HttpStatusCode.OK)
+                } else {
+                    call.respondText("Duplicate session!")
+                    call.response.status(HttpStatusCode.NoContent)
+                }
+            }
+            is CreateSessionResult.LoginFailed -> {
+                call.respondText("Internal error!")
+                call.response.status(HttpStatusCode.InternalServerError)
+            }
+            is CreateSessionResult.RefreshTokenExpired -> {
+                // Should not happen for CreateToken flow, but handle gracefully
+                call.respondText("Internal error!")
+                call.response.status(HttpStatusCode.InternalServerError)
+            }
         }
     }
 }

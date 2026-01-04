@@ -10,14 +10,15 @@ import io.ktor.client.plugins.sse.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import io.typst.chzzk.bridge.api.ApiFetchChzzkMessage
-import io.typst.chzzk.bridge.api.ApiFetchResponseBody
+import io.typst.chzzk.bridge.api.ApiSseChatMessage
 import io.typst.chzzk.bridge.api.ApiSubscribeResponseBody
 import io.typst.chzzk.bridge.mock.TestChzzkGateway
 import io.typst.chzzk.bridge.persis.UserToken
 import io.typst.chzzk.bridge.repository.SQLiteBridgeRepository
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import org.junit.jupiter.api.AfterEach
@@ -27,7 +28,6 @@ import org.junit.jupiter.api.assertNotNull
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.file.Files
-import java.time.Instant
 import java.util.*
 import kotlin.test.assertEquals
 
@@ -44,7 +44,7 @@ class E2ETest {
     fun setup(@TempDir dir: File) {
         val dbFile = Files.createTempFile(dir.toPath(), "chzzk_bridge-", ".db").toFile()
         rootJob = Job()
-        scope = CoroutineScope(rootJob + Dispatchers.Main)
+        scope = CoroutineScope(rootJob + Dispatchers.Default)
         testChzzkGateway = TestChzzkGateway()
         service = createChzzkService(
             scope,
@@ -81,15 +81,19 @@ class E2ETest {
     }
 
     @AfterEach
-    fun tearDown() = runBlocking {
-        service.close()
+    fun tearDown() {
+        oAuthClient.close()
+        apiClient.close()
         scope.cancel()
-        rootJob.join()
+        runBlocking {
+            rootJob.join()
+            println("exit")
+        }
     }
 
     private suspend fun testFetch(uuid: UUID) {
         // poll messages
-        val msg = ApiFetchChzzkMessage(
+        val msg = ApiSseChatMessage(
             1, channelId, "senderId", "senderName", "msg",
             nowInstant()
         )
@@ -97,25 +101,29 @@ class E2ETest {
         service.bridgeRepository.addMessage(msg)
         service.bridgeRepository.addMessage(msgB)
 
+        val sseMessages = mutableListOf<ApiSseChatMessage>()
         apiClient.sse({
-            url("api/v1/sse?fromId=1&uuid=$uuid")
+            url("api/v1/sse?uuid=$uuid")
         }, deserialize = { typeInfo, jsonString ->
             val serializer = Json.serializersModule.serializer(typeInfo.kotlinType!!)
             Json.decodeFromString(serializer, jsonString)!!
         }) {
-            // receive first event and verify
-            val event = incoming.first()
-            val data = Json.decodeFromString<ApiFetchResponseBody>(event.data!!)
-            println(data)
-            assertEquals(
-                ApiFetchResponseBody(listOf(msg, msgB)),
-                data
-            )
+            // receive individual messages (no longer a list)
+            val events = incoming.filter { it.event != "heartbeat" }.take(2).toList()
+            val receivedMessages = events
+                .map { event ->
+                    val data = Json.decodeFromString<ApiSseChatMessage>(event.data!!)
+                    println("Received: $data (SSE id: ${event.id})")
+                    data
+                }
+            sseMessages.addAll(receivedMessages)
+            cancel()
         }
+        assertEquals(listOf(msg, msgB), sseMessages)
     }
 
     @Test
-    suspend fun `e2e create token`(): Unit {
+    fun `e2e create token`(): Unit = scope.launchAndJoin {
         // try subscribe
         val uuid = UUID.randomUUID()
         val response = apiClient.post(ApiSubscribePathParameters(uuid))
@@ -138,7 +146,7 @@ class E2ETest {
     }
 
     @Test
-    suspend fun `e2e subscribe with token`() {
+    fun `e2e subscribe with token`() = scope.launchAndJoin {
         // subscribe
         val uuid = UUID.randomUUID()
         val token = UserToken(channelId, uuid, "testAT", "testRT", nowInstant().plusSeconds(3600))

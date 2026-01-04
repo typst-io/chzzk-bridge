@@ -4,6 +4,6 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class ApiFetchResponseBody(
-    val elements: List<ApiFetchChzzkMessage>,
+    val elements: List<ApiSseChatMessage>,
     val error: String? = null,
 )
