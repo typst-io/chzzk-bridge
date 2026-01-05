@@ -51,7 +51,7 @@ class ApiSubscribeEndpointTest {
         gateway.registerToken(userInfo.toToken(uuid))
         token = userInfo.toToken(uuid)
 
-        service = ChzzkService(testScope, bridgeRepo, sessionRepo, gateway)
+        service = createChzzkService(testScope, bridgeRepository = bridgeRepo, sessionStore = sessionRepo, chzzkGateway = gateway)
         testChzzkGateway = gateway
     }
 

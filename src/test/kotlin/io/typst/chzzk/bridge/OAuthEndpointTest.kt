@@ -48,7 +48,7 @@ class OAuthEndpointTest {
         token = userInfo.toToken(uuid)
 
         testChzzkGateway = gateway
-        service = ChzzkService(testScope, bridgeRepo, sessionRepo, gateway)
+        service = createChzzkService(testScope, bridgeRepository = bridgeRepo, sessionStore = sessionRepo, chzzkGateway = gateway)
     }
 
     @AfterEach

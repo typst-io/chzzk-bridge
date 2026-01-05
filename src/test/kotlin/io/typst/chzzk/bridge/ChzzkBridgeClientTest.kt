@@ -5,7 +5,6 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.resources.*
-import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.typst.chzzk.bridge.api.ApiSseChatMessage
@@ -50,7 +49,7 @@ class ChzzkBridgeClientTest {
         testChzzkGateway = TestChzzkGateway()
         service = createChzzkService(
             scope,
-            SQLiteBridgeRepository(dir, dbFile),
+            bridgeRepository = SQLiteBridgeRepository(dir, dbFile),
             chzzkGateway = testChzzkGateway
         )
         runBlocking {

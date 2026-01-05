@@ -48,7 +48,7 @@ class E2ETest {
         testChzzkGateway = TestChzzkGateway()
         service = createChzzkService(
             scope,
-            SQLiteBridgeRepository(dir, dbFile),
+            bridgeRepository = SQLiteBridgeRepository(dir, dbFile),
             chzzkGateway = testChzzkGateway
         )
         runBlocking {

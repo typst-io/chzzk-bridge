@@ -30,7 +30,7 @@ object ApiEndpoints {
         // no token
         if (loginMethod == null) {
             val state = service.issueState(req.uuid)
-            val path = getUriChzzkAccountInterlock(clientId, state)
+            val path = getUriChzzkAccountInterlock(service.config.clientId, state, service.config.hostname)
             call.respond(HttpStatusCode.Unauthorized, ApiSubscribeResponseBody(state, path))
             return
         }
@@ -46,13 +46,15 @@ object ApiEndpoints {
                 result.session.await()
                 call.respondText("{}", status = HttpStatusCode.OK)
             }
+
             is CreateSessionResult.LoginFailed -> {
                 call.respondText("{}", status = HttpStatusCode.InternalServerError)
             }
+
             is CreateSessionResult.RefreshTokenExpired -> {
                 // treat as if no token exists - require re-authentication
                 val state = service.issueState(req.uuid)
-                val path = getUriChzzkAccountInterlock(clientId, state)
+                val path = getUriChzzkAccountInterlock(service.config.clientId, state)
                 call.respond(HttpStatusCode.Unauthorized, ApiSubscribeResponseBody(state, path))
             }
         }
