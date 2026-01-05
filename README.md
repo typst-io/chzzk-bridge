@@ -93,7 +93,7 @@ https://chzzk.naver.com/account-interlock?clientId={CLIENT_ID}&state={state}&red
 
 ---
 
-### GET /api/v1/sse (SSE)
+### SSE /api/v1/sse
 
 CHZZK 메시지(채팅, 도네이션) 스트리밍을 위한 Server-Sent Events.
 
@@ -183,7 +183,7 @@ data: {"elements":[...],"error":null}
 |               | <------------------------- |                |
 +---------------+    200 OK                  +----------------+
         |
-        | 7. GET /fetch (SSE)
+        | 7. SSE /sse
         v
 +---------------+                            +----------------+
 |  Minecraft    |  <-- Event Streaming --    |  chzzk-bridge  |
