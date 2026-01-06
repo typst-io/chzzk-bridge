@@ -11,7 +11,7 @@ import io.typst.chzzk.bridge.auth.UserLoginMethod
 import kotlinx.coroutines.future.await
 
 object OAuthEndpoints {
-    private val successHtml: String by lazy {
+    private val successHtmlTemplate: String by lazy {
         loadResource("static/oauth-success.html")
     }
 
@@ -25,6 +25,23 @@ object OAuthEndpoints {
             ?.bufferedReader()
             ?.readText()
             ?: error("Resource not found: $path")
+
+    private fun renderPermissionsHtml(permissions: Map<String, String>): String =
+        permissions.toList().joinToString("\n") { (name, desc) ->
+            """
+            <li class="permission-item">
+                <svg class="permission-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                    <polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                $name
+                <span class="permission-desc">$desc</span>
+            </li>
+            """.trimIndent()
+        }
+
+    private fun renderSuccessHtml(permissions: Map<String, String>): String =
+        successHtmlTemplate.replace("{{PERMISSIONS}}", renderPermissionsHtml(permissions))
 
     suspend fun onRequest(
         ctx: RoutingContext,
@@ -57,7 +74,7 @@ object OAuthEndpoints {
             call.respondErrorHtml(
                 HttpStatusCode.NotAcceptable,
                 "이미 연동됨",
-                "이 계정은 이미 치지직과 연동되어 있습니다.<br>재연동하려면 먼저 연동을 해제해주세요."
+                "이 계정은 이미 치지직과 연동되어 있습니다."
             )
             return
         }
@@ -67,7 +84,11 @@ object OAuthEndpoints {
             is CreateSessionResult.Success -> {
                 if (result.created) {
                     result.session.await()
-                    call.respondText(successHtml, ContentType.Text.Html, HttpStatusCode.OK)
+                    call.respondText(
+                        renderSuccessHtml(service.config.scopes.associate { it.label to it.description }),
+                        ContentType.Text.Html,
+                        HttpStatusCode.OK
+                    )
                 } else {
                     call.respondErrorHtml(
                         HttpStatusCode.NoContent,
@@ -76,6 +97,7 @@ object OAuthEndpoints {
                     )
                 }
             }
+
             is CreateSessionResult.LoginFailed -> {
                 call.respondErrorHtml(
                     HttpStatusCode.InternalServerError,
@@ -83,6 +105,7 @@ object OAuthEndpoints {
                     "예기치 않은 오류가 발생했습니다.<br>잠시 후 다시 시도해주세요."
                 )
             }
+
             is CreateSessionResult.RefreshTokenExpired -> {
                 call.respondErrorHtml(
                     HttpStatusCode.InternalServerError,
@@ -100,7 +123,7 @@ object OAuthEndpoints {
     ) {
         val html = errorHtmlTemplate
             .replace("{{TITLE}}", title)
-            .replace("{{MESSAGE}}", message)
+            .replace("{{MESSAGE}}", "$message<br>${status.value} ${status.description}")
         respondText(html, ContentType.Text.Html, status)
     }
 }

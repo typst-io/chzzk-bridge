@@ -123,7 +123,7 @@ class E2ETest {
     }
 
     @Test
-    fun `e2e create token`(): Unit = scope.launchAndJoin {
+    fun `e2e create token`(): Unit = scope.runBlockingWithContext {
         // try subscribe
         val uuid = UUID.randomUUID()
         val response = apiClient.post(ApiSubscribePathParameters(uuid))
@@ -146,7 +146,7 @@ class E2ETest {
     }
 
     @Test
-    fun `e2e subscribe with token`() = scope.launchAndJoin {
+    fun `e2e subscribe with token`() = scope.runBlockingWithContext {
         // subscribe
         val uuid = UUID.randomUUID()
         val token = UserToken(channelId, uuid, "testAT", "testRT", nowInstant().plusSeconds(3600))

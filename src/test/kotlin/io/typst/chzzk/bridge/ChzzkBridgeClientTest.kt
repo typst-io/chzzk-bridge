@@ -91,7 +91,7 @@ class ChzzkBridgeClientTest {
     }
 
     @Test
-    fun `client subscribe with token returns SUCCESS`() = scope.launchAndJoin {
+    fun `client subscribe with token returns SUCCESS`() = scope.runBlockingWithContext {
         val uuid = UUID.randomUUID()
         val token = UserToken(channelId, uuid, "testAT", "testRT", nowInstant().plusSeconds(3600))
         service.bridgeRepository.setToken(token)
@@ -104,7 +104,7 @@ class ChzzkBridgeClientTest {
     }
 
     @Test
-    fun `client full OAuth flow and subscribe`() = scope.launchAndJoin {
+    fun `client full OAuth flow and subscribe`() = scope.runBlockingWithContext {
         val uuid = UUID.randomUUID()
 
         // Step 1: subscribe without token -> AUTH_REQUIRED
@@ -124,7 +124,7 @@ class ChzzkBridgeClientTest {
     }
 
     @Test
-    fun `client SSE streaming receives messages`() = scope.launchAndJoin {
+    fun `client SSE streaming receives messages`() = scope.runBlockingWithContext {
         val uuid = UUID.randomUUID()
         val token = UserToken(channelId, uuid, "testAT", "testRT", nowInstant().plusSeconds(3600))
         service.bridgeRepository.setToken(token)
@@ -180,7 +180,7 @@ class ChzzkBridgeClientTest {
     }
 
     @Test
-    fun `client SSE with lastEventId resumes from position`() = scope.launchAndJoin {
+    fun `client SSE with lastEventId resumes from position`() = scope.runBlockingWithContext {
         val uuid = UUID.randomUUID()
         val token = UserToken(channelId, uuid, "testAT", "testRT", nowInstant().plusSeconds(3600))
         service.bridgeRepository.setToken(token)
@@ -217,7 +217,7 @@ class ChzzkBridgeClientTest {
     }
 
     @Test
-    fun `client unsubscribe removes session`() = scope.launchAndJoin {
+    fun `client unsubscribe removes session`() = scope.runBlockingWithContext {
         val uuid = UUID.randomUUID()
         val token = UserToken(channelId, uuid, "testAT", "testRT", nowInstant().plusSeconds(3600))
         service.bridgeRepository.setToken(token)
@@ -233,7 +233,7 @@ class ChzzkBridgeClientTest {
     }
 
     @Test
-    fun `client subscribeAsync works correctly`() = scope.launchAndJoin {
+    fun `client subscribeAsync works correctly`() = scope.runBlockingWithContext {
         val uuid = UUID.randomUUID()
         val token = UserToken(channelId, uuid, "testAT", "testRT", nowInstant().plusSeconds(3600))
         service.bridgeRepository.setToken(token)

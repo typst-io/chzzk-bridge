@@ -77,7 +77,8 @@ class Chzzk4jGateway(
     override suspend fun connectSession(): ChzzkSessionGateway {
         val session = createChzzkUserSession(client)
         for (scope in config.scopes) {
-            session.subscribeAsync(scope.toChzzk4jScope()).await()
+            val scope = scope.toChzzk4jSessionScope() ?: continue
+            session.subscribeAsync(scope).await()
         }
         session.createAndConnectAsync().await()
 

@@ -8,10 +8,11 @@ import xyz.r2turntrue.chzzk4j.session.ChzzkUserSession
 import xyz.r2turntrue.chzzk4j.session.event.SessionConnectedEvent
 import xyz.r2turntrue.chzzk4j.session.event.SessionDisconnectedEvent
 
-fun ChzzkApiScope.toChzzk4jScope(): ChzzkSessionSubscriptionType =
+fun ChzzkApiScope.toChzzk4jSessionScope(): ChzzkSessionSubscriptionType? =
     when (this) {
         ChzzkApiScope.CHAT -> ChzzkSessionSubscriptionType.CHAT
         ChzzkApiScope.DONATION -> ChzzkSessionSubscriptionType.DONATION
+        else -> null
     }
 
 //fun createChzzkClient(adapter: ChzzkLoginAdapter, clientId: String, clientSecret: String): ChzzkClient =

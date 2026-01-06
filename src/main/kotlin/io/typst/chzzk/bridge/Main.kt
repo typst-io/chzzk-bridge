@@ -21,7 +21,7 @@ import java.util.random.RandomGenerator
 val logger: Logger = LoggerFactory.getLogger("io.typst.chzzk.bridge.main")
 val oAuthServerPort: Int = 39680
 val apiServerPort: Int = 39681
-val random = RandomGenerator.getDefault()
+val random: RandomGenerator = RandomGenerator.getDefault()
 val configJson: Json = Json {
     prettyPrint = true
     encodeDefaults = true
@@ -84,6 +84,9 @@ suspend fun startApp(scope: CoroutineScope, service: ChzzkService, config: Bridg
         commonModule()
         oAuthModule(service)
     }.startSuspend(false)
+
+    // init db
+    service.bridgeRepository.getToken(UUID.randomUUID())
 
     return scope.launch(Dispatchers.Default) {
         try {
