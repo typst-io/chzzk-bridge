@@ -4,6 +4,7 @@ import io.typst.chzzk.bridge.auth.LoginMethod
 import io.typst.chzzk.bridge.auth.UserLoginMethod
 import io.typst.chzzk.bridge.chzzk.ChzzkGateway
 import io.typst.chzzk.bridge.chzzk.ChzzkSessionGateway
+import io.typst.chzzk.bridge.config.BridgeConfig
 import io.typst.chzzk.bridge.persis.UserToken
 import io.typst.chzzk.bridge.repository.BridgeRepository
 import kotlinx.coroutines.CoroutineScope
@@ -26,6 +27,7 @@ data class ChzzkService(
     val bridgeRepository: BridgeRepository,
     val sessionStore: SessionStore,
     val chzzkGateway: ChzzkGateway,
+    val config: BridgeConfig,
 ) {
     fun issueState(uuid: UUID): String {
         return sessionStore.issueState(uuid)

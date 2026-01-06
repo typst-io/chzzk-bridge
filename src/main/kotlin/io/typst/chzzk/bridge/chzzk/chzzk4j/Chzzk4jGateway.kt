@@ -6,8 +6,7 @@ import io.typst.chzzk.bridge.auth.UserLoginMethod
 import io.typst.chzzk.bridge.chzzk.ChzzkGateway
 import io.typst.chzzk.bridge.chzzk.ChzzkSessionGateway
 import io.typst.chzzk.bridge.chzzk.ChzzkUserData
-import io.typst.chzzk.bridge.createChzzkClient
-import io.typst.chzzk.bridge.createChzzkUserSession
+import io.typst.chzzk.bridge.config.BridgeConfig
 import io.typst.chzzk.bridge.logger
 import io.typst.chzzk.bridge.repository.BridgeRepository
 import kotlinx.coroutines.CoroutineScope
@@ -15,15 +14,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import xyz.r2turntrue.chzzk4j.ChzzkClient
+import xyz.r2turntrue.chzzk4j.ChzzkClientBuilder
 import xyz.r2turntrue.chzzk4j.auth.ChzzkLoginAdapter
 import xyz.r2turntrue.chzzk4j.auth.ChzzkOauthCodeLoginAdapter
 import xyz.r2turntrue.chzzk4j.auth.ChzzkSimpleUserLoginAdapter
-import xyz.r2turntrue.chzzk4j.session.ChzzkSessionSubscriptionType
 import xyz.r2turntrue.chzzk4j.session.event.SessionChatMessageEvent
 import xyz.r2turntrue.chzzk4j.session.event.SessionDonationEvent
 import java.time.Instant
 import java.util.*
-import java.util.logging.Level
 
 fun UserLoginMethod.toChzzkLoginAdapter(): ChzzkLoginAdapter {
     return when (method) {
@@ -35,12 +33,15 @@ fun UserLoginMethod.toChzzkLoginAdapter(): ChzzkLoginAdapter {
 class Chzzk4jGateway(
     val applicationScope: CoroutineScope,
     val bridgeRepository: BridgeRepository,
+    val config: BridgeConfig,
 ) : ChzzkGateway {
     lateinit var client: ChzzkClient
 
     private fun getClient(loginMethod: UserLoginMethod): ChzzkClient {
         if (!this::client.isInitialized) {
-            client = createChzzkClient(loginMethod.toChzzkLoginAdapter())
+            client = ChzzkClientBuilder(config.clientId, config.clientSecret)
+                .withLoginAdapter(loginMethod.toChzzkLoginAdapter())
+                .build()
         }
         return client
     }
@@ -58,7 +59,7 @@ class Chzzk4jGateway(
             client.loginAsync().await()
             client.fetchLoggedUser().await()
         } catch (ex: Exception) {
-            logger.log(Level.WARNING, "Error while login", ex)
+            logger.warn("Error while login", ex)
             null
         }
         return if (chzzkUser != null) {
@@ -75,8 +76,10 @@ class Chzzk4jGateway(
 
     override suspend fun connectSession(): ChzzkSessionGateway {
         val session = createChzzkUserSession(client)
-        session.subscribeAsync(ChzzkSessionSubscriptionType.CHAT).await() // TODO: remove, this for debug
-        session.subscribeAsync(ChzzkSessionSubscriptionType.DONATION).await()
+        for (scope in config.scopes) {
+            val scope = scope.toChzzk4jSessionScope() ?: continue
+            session.subscribeAsync(scope).await()
+        }
         session.createAndConnectAsync().await()
 
         session.on(SessionChatMessageEvent::class.java) { e ->
