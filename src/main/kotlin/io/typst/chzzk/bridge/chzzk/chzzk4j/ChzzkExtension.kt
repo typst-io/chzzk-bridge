@@ -1,12 +1,24 @@
 package io.typst.chzzk.bridge.chzzk.chzzk4j
 
+import io.typst.chzzk.bridge.auth.LoginMethod
+import io.typst.chzzk.bridge.auth.UserLoginMethod
 import io.typst.chzzk.bridge.config.ChzzkApiScope
 import xyz.r2turntrue.chzzk4j.ChzzkClient
+import xyz.r2turntrue.chzzk4j.auth.ChzzkLoginAdapter
+import xyz.r2turntrue.chzzk4j.auth.ChzzkOauthCodeLoginAdapter
+import xyz.r2turntrue.chzzk4j.auth.ChzzkSimpleUserLoginAdapter
 import xyz.r2turntrue.chzzk4j.session.ChzzkSessionBuilder
 import xyz.r2turntrue.chzzk4j.session.ChzzkSessionSubscriptionType
 import xyz.r2turntrue.chzzk4j.session.ChzzkUserSession
 import xyz.r2turntrue.chzzk4j.session.event.SessionConnectedEvent
 import xyz.r2turntrue.chzzk4j.session.event.SessionDisconnectedEvent
+
+fun UserLoginMethod.toChzzkLoginAdapter(): ChzzkLoginAdapter {
+    return when (method) {
+        is LoginMethod.CreateToken -> ChzzkOauthCodeLoginAdapter(method.code, method.state)
+        is LoginMethod.UseToken -> ChzzkSimpleUserLoginAdapter(method.accessToken, method.refreshToken)
+    }
+}
 
 fun ChzzkApiScope.toChzzk4jSessionScope(): ChzzkSessionSubscriptionType? =
     when (this) {

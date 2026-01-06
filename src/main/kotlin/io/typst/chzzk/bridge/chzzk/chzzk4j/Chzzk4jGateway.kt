@@ -15,20 +15,11 @@ import kotlinx.coroutines.future.await
 import kotlinx.coroutines.launch
 import xyz.r2turntrue.chzzk4j.ChzzkClient
 import xyz.r2turntrue.chzzk4j.ChzzkClientBuilder
-import xyz.r2turntrue.chzzk4j.auth.ChzzkLoginAdapter
-import xyz.r2turntrue.chzzk4j.auth.ChzzkOauthCodeLoginAdapter
-import xyz.r2turntrue.chzzk4j.auth.ChzzkSimpleUserLoginAdapter
 import xyz.r2turntrue.chzzk4j.session.event.SessionChatMessageEvent
 import xyz.r2turntrue.chzzk4j.session.event.SessionDonationEvent
 import java.time.Instant
 import java.util.*
 
-fun UserLoginMethod.toChzzkLoginAdapter(): ChzzkLoginAdapter {
-    return when (method) {
-        is LoginMethod.CreateToken -> ChzzkOauthCodeLoginAdapter(method.code, method.state)
-        is LoginMethod.UseToken -> ChzzkSimpleUserLoginAdapter(method.accessToken, method.refreshToken)
-    }
-}
 
 class Chzzk4jGateway(
     val applicationScope: CoroutineScope,
